@@ -9,6 +9,7 @@ using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
@@ -20,7 +21,7 @@ namespace ParteVisualCalculadora.ViewModels
     public class MainWindowViewModel : ViewModelBase
     {
         private string m_DisplayText = "0"; ////valor temporal para asignarle a la propiedad. Llegan a usar en underscore en vez de
-        //private ObservableCollection<OperationClass> operations;
+        private bool shouldDelPressWork = true;
 
         public string DisplayText
         {
@@ -81,12 +82,16 @@ namespace ParteVisualCalculadora.ViewModels
 
         private void DelPress()
         {
-            DisplayText = String.Empty;
+            if (!String.IsNullOrEmpty(DisplayText) && shouldDelPressWork)
+            {
+                DisplayText = DisplayText.Remove(DisplayText.Length - 1);
+            }
         }
 
         private void DeletePress()
         {
             DisplayText = String.Empty;
+            shouldDelPressWork = true;
         }
 
         private void ClosePaPress()
@@ -168,18 +173,41 @@ namespace ParteVisualCalculadora.ViewModels
             DisplayText = DisplayText + "0";
         }
 
-        private void EqualPress()
+        private async void EqualPress()
         {
-            RealizarCalculos();
 
+            await SendDataToApiAsync();
+            shouldDelPressWork = false;
+            //RealizarCalculos();
 
-            //CallAddTwoNumbersEndpoint();
         }
+
+
+        private async Task SendDataToApiAsync()
+        {
+            string encodedQuery = WebUtility.UrlEncode(DisplayText);
+
+            string url = $"http://localhost:5140/Operaciones/calculos?DisplayText={encodedQuery}";
+
+            using (HttpClient client = new HttpClient())
+            {
+                HttpResponseMessage response = await client.GetAsync(url);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    string responseContent = await response.Content.ReadAsStringAsync();
+                    // Process the response here
+                    DisplayText = responseContent;
+                }
+            }
+        }
+
+
 
         private async void RealizarCalculos()
         {
             string connectionString = @"Data Source=.\SQLEXPRESS;Initial Catalog=OperationsCollection; Integrated Security=True;";
-            //string connectionString = ConfigurationManager.ConnectionStrings["OperationsCollectionConnectionString"].ConnectionString;
+
             // Crear la conexión con la base de datos
             using (SqlConnection connection = new SqlConnection(connectionString))
             {
@@ -210,44 +238,11 @@ namespace ParteVisualCalculadora.ViewModels
                 DisplayText = result;
 
             }
-            //using (SqlConnection connection = new SqlConnection(connectionString))
-            //{
-            //    connection.Open();
-            //    SqlCommand command = new SqlCommand("SELECT TOP 1 Operacion FROM OperacionAlmacenada ORDER BY OperationID DESC", connection);
-            //    SqlDataReader reader = command.ExecuteReader();
-            //    if (reader.Read())
-            //    {
-            //        string operacion = reader.GetString(0);
-            //        // Realizar el cálculo
-            //        DataTable table = new DataTable();
-            //        try
-            //        {
-            //            var result = table.Compute(operacion, "");
-            //            DisplayText = result.ToString();
-            //        }
-            //        catch (Exception ex)
-            //        {
-            //            // Si hay un error, mostrar el mensaje en DisplayText
-            //            DisplayText = ex.Message;
-            //        }
-            //    }
-            //    reader.Close();
-            //}
+
 
 
         }
 
-        //private async void CallAddTwoNumbersEndpoint()
-        //{
-        //    using (var client = new HttpClient())
-        //    {
-        //        var response = await client.GetAsync("http://localhost:5140/BasicOperation/AddTwoNumbers?number1=2&number2=3");
-        //        response.EnsureSuccessStatusCode();
-        //        var result = await response.Content.ReadAsStringAsync();
-        //        DisplayText = result;
-        //        // use the result as needed
-        //    }
-        //}
 
         private void NumberNinePress()
         {
